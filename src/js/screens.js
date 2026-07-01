@@ -73,12 +73,12 @@ export function drawStartScreen() {
   state.c.fillStyle = state.colors.overlay
   state.c.fillRect(0, 0, state.canvas.width, state.canvas.height)
 
-  drawTitle('MARIO MISSION', 165)
+  drawTitle('STELLAR DEFENDER', 165)
 
   state.c.fillStyle = state.colors.white
   state.c.font = '24px Arial'
   state.c.textAlign = 'center'
-  state.c.fillText('Point A to Point B', state.canvas.width / 2, 205)
+  state.c.fillText('Defend the Galaxy', state.canvas.width / 2, 205)
   state.c.textAlign = 'left'
 
   drawButton(state.buttons.start)
