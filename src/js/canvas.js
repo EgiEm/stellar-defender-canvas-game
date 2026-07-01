@@ -23,7 +23,7 @@ let lastFrameTime = 0
 let gameState = 'start'
 let selectedMission = 1
 let selectedDifficulty = 'easy'
-let unlockedMissionCount = Number(localStorage.getItem('unlockedMissionCount')) || 1
+let unlockedMissionCount = totalMissions
 
 if (unlockedMissionCount < 1) unlockedMissionCount = 1
 if (unlockedMissionCount > totalMissions) unlockedMissionCount = totalMissions
@@ -188,7 +188,11 @@ class GenericObject {
   }
 
   draw() {
-    c.drawImage(this.image, this.position.x, this.position.y)
+    const startX = ((this.position.x % this.width) + this.width) % this.width - this.width
+
+    for (let x = startX; x < canvas.width + this.width; x += this.width) {
+      c.drawImage(this.image, x, this.position.y)
+    }
   }
 }
 
@@ -294,7 +298,7 @@ class Boss {
     this.position = { x, y }
     this.width = 135
     this.height = 165
-    this.maxHealth = 150
+    this.maxHealth = 500
     this.health = this.maxHealth
     this.shootTimer = 90
     this.alive = true
@@ -632,7 +636,7 @@ function createMissionPlatforms() {
 
   if (mission === 13) {
     platformsList.push(new Platform({ x: x + 250, y: 470, image: platformImage }))
-    platformsList.push(new Platform({ x: x + 720, y: 430, image: platformImage }))
+    platformsList.push(new Platform({ x: x + 720, y: 470, image: platformImage }))
     platformsList.push(new Platform({ x: x + 1190, y: 470, image: platformImage }))
     platformsList.push(new Platform({ x: x + 1660, y: 470, image: platformImage }))
   }
@@ -757,11 +761,59 @@ function drawGameHud() {
 }
 
 function drawPlayerWeapon() {
-  c.fillStyle = '#111827'
-  c.fillRect(player.position.x + player.width - 10, player.position.y + 74, 58, 8)
+  const handX = player.position.x + player.width - 12
+  const handY = player.position.y + 78
+  const gunX = handX + 6
+  const gunY = handY - 8
 
+  c.save()
+
+  // Arm / hand holding the gun
+  c.fillStyle = '#f2c9a0'
+  drawRoundedRect(handX - 12, handY - 2, 24, 12, 6)
+  c.fill()
+
+  c.fillStyle = '#d8a06f'
+  drawRoundedRect(handX + 2, handY - 4, 16, 16, 6)
+  c.fill()
+
+  // Gun body
+  c.fillStyle = '#111827'
+  drawRoundedRect(gunX, gunY, 54, 16, 5)
+  c.fill()
+
+  // Top metal shine
+  c.fillStyle = '#64748b'
+  c.fillRect(gunX + 8, gunY + 3, 28, 3)
+
+  // Barrel
+  c.fillStyle = '#030712'
+  c.fillRect(gunX + 50, gunY + 5, 24, 6)
+
+  // Muzzle
+  c.fillStyle = '#38bdf8'
+  c.fillRect(gunX + 74, gunY + 4, 5, 8)
+
+  // Grip
   c.fillStyle = '#374151'
-  c.fillRect(player.position.x + player.width + 10, player.position.y + 82, 12, 18)
+  drawRoundedRect(gunX + 16, gunY + 13, 12, 25, 4)
+  c.fill()
+
+  // Stock
+  c.fillStyle = '#1f2937'
+  drawRoundedRect(gunX - 13, gunY + 4, 18, 12, 4)
+  c.fill()
+
+  // Sight
+  c.strokeStyle = '#e5e7eb'
+  c.lineWidth = 2
+  c.beginPath()
+  c.moveTo(gunX + 24, gunY)
+  c.lineTo(gunX + 30, gunY - 8)
+  c.lineTo(gunX + 38, gunY)
+  c.stroke()
+
+  c.restore()
 }
 
 function drawBossHealth() {
@@ -1007,7 +1059,7 @@ function playMission() {
     gameState = 'won'
   }
 
-  const deathLine = 470
+  const deathLine = 570
 
   if (player.position.y + player.height >= deathLine && !player.canJump) {
     init()
