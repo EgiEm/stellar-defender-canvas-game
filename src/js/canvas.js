@@ -3,18 +3,25 @@ import hills from '../../img/hills.png'
 import background from '../../img/background.png'
 import platformSmallTall from '../../img/platformSmallTall.png'
 
-import spriteRunLeft from '../../img/spriteRunLeft.png'
-import spriteRunRight from '../../img/spriteRunRight.png'
-import spriteStandLeft from '../../img/spriteStandLeft.png'
-import spriteStandRight from '../../img/spriteStandRight.png'
+import { createImage, drawRoundedRect, isInsideButton, rectanglesTouch } from './utils.js'
 
-const canvas = document.querySelector('canvas')
-const c = canvas.getContext('2d')
+import { Player } from './classes/Player.js'
+import { Platform } from './classes/Platform.js'
+import { GenericObject } from './classes/GenericObject.js'
+import { Enemy } from './classes/Enemy.js'
+import { WeaponPickup } from './classes/WeaponPickup.js'
+import { Bullet } from './classes/Bullet.js'
+import { Boss } from './classes/Boss.js'
+import { Door } from './classes/Door.js'
+
+// Canvas and Render context configuration exports
+export const canvas = document.querySelector('canvas')
+export const c = canvas.getContext('2d')
 
 canvas.width = 1024
 canvas.height = 576
 
-const gravity = 0.5
+export const gravity = 0.5
 const totalMissions = 13
 const targetFPS = 60
 const frameDelay = 1000 / targetFPS
@@ -28,7 +35,7 @@ let unlockedMissionCount = totalMissions
 if (unlockedMissionCount < 1) unlockedMissionCount = 1
 if (unlockedMissionCount > totalMissions) unlockedMissionCount = totalMissions
 
-const colors = {
+export const colors = {
   blue: '#1d4ed8',
   blueDark: '#0f2f78',
   locked: '#334155',
@@ -85,323 +92,16 @@ const missionNames = [
   'Final War'
 ]
 
-class Player {
-  constructor() {
-    this.speed = 8
-    this.position = { x: 100, y: 100 }
-    this.previousPosition = { x: 100, y: 100 }
-    this.velocity = { x: 0, y: 0 }
-    this.width = 66
-    this.height = 150
-    this.frames = 0
-    this.canJump = false
-    this.lives = 3
-    this.hasWeapon = false
-    this.ammo = 30
-    this.maxAmmo = 30
-    this.reloadTimer = 0
-    this.shootTimer = 0
-
-    this.sprites = {
-      stand: {
-        right: createImage(spriteStandRight),
-        left: createImage(spriteStandLeft),
-        cropWidth: 177,
-        width: 66
-      },
-      run: {
-        right: createImage(spriteRunRight),
-        left: createImage(spriteRunLeft),
-        cropWidth: 341,
-        width: 127.875
-      }
-    }
-
-    this.currentSprite = this.sprites.stand.right
-    this.currentCropWidth = 177
-  }
-
-  draw() {
-    c.drawImage(
-      this.currentSprite,
-      this.currentCropWidth * this.frames,
-      0,
-      this.currentCropWidth,
-      400,
-      this.position.x,
-      this.position.y,
-      this.width,
-      this.height
-    )
-
-    if (this.hasWeapon) drawPlayerWeapon()
-  }
-
-  update() {
-    this.previousPosition.x = this.position.x
-    this.previousPosition.y = this.position.y
-
-    this.frames++
-
-    if (this.frames > 28) this.frames = 0
-
-    this.draw()
-    this.position.x += this.velocity.x
-    this.position.y += this.velocity.y
-
-    if (this.position.y + this.height + this.velocity.y <= canvas.height) {
-      this.velocity.y += gravity
-      this.canJump = false
-    } else {
-      this.velocity.y = 0
-      this.canJump = true
-    }
-
-    if (this.reloadTimer > 0) {
-      this.reloadTimer--
-      if (this.reloadTimer === 0) this.ammo = this.maxAmmo
-    }
-
-    if (this.shootTimer > 0) this.shootTimer--
-  }
-}
-
-class Platform {
-  constructor({ x, y, image }) {
-    this.position = { x, y }
-    this.image = image
-    this.width = image.width
-    this.height = image.height
-  }
-
-  draw() {
-    c.drawImage(this.image, this.position.x, this.position.y)
-  }
-}
-
-class GenericObject {
-  constructor({ x, y, image }) {
-    this.position = { x, y }
-    this.image = image
-    this.width = image.width
-    this.height = image.height
-  }
-
-  draw() {
-    const startX = ((this.position.x % this.width) + this.width) % this.width - this.width
-
-    for (let x = startX; x < canvas.width + this.width; x += this.width) {
-      c.drawImage(this.image, x, this.position.y)
-    }
-  }
-}
-
-class Enemy {
-  constructor({ x, y, startX, endX, speed }) {
-    this.position = { x, y }
-    this.width = 52
-    this.height = 52
-    this.startX = startX
-    this.endX = endX
-    this.speed = speed
-    this.velocity = { x: speed }
-    this.alive = true
-  }
-
-  draw() {
-    if (!this.alive) return
-
-    c.fillStyle = '#7f1d1d'
-    drawRoundedRect(this.position.x, this.position.y, this.width, this.height, 10)
-    c.fill()
-
-    c.fillStyle = '#ffffff'
-    c.beginPath()
-    c.arc(this.position.x + 16, this.position.y + 18, 5, 0, Math.PI * 2)
-    c.arc(this.position.x + 36, this.position.y + 18, 5, 0, Math.PI * 2)
-    c.fill()
-  }
-
-  update() {
-    if (!this.alive) return
-
-    this.position.x += this.velocity.x
-
-    if (this.position.x <= this.startX || this.position.x + this.width >= this.endX) {
-      this.velocity.x *= -1
-    }
-
-    this.draw()
-  }
-}
-
-class WeaponPickup {
-  constructor({ x, y }) {
-    this.position = { x, y }
-    this.width = 90
-    this.height = 45
-    this.collected = false
-  }
-
-  draw() {
-    if (this.collected) return
-
-    c.fillStyle = '#facc15'
-    c.font = 'bold 18px Arial'
-    c.fillText('M4', this.position.x + 20, this.position.y - 12)
-
-    c.fillStyle = '#111827'
-    drawRoundedRect(this.position.x, this.position.y + 10, 68, 12, 3)
-    c.fill()
-
-    c.fillStyle = '#374151'
-    c.fillRect(this.position.x + 20, this.position.y + 22, 14, 20)
-    c.fillRect(this.position.x + 52, this.position.y + 7, 32, 6)
-
-    c.fillStyle = '#e5e7eb'
-    c.fillRect(this.position.x + 6, this.position.y + 13, 12, 6)
-  }
-}
-
-class Bullet {
-  constructor({ x, y, speed, fromBoss = false }) {
-    this.position = { x, y }
-    this.width = fromBoss ? 22 : 14
-    this.height = fromBoss ? 22 : 6
-    this.speed = speed
-    this.fromBoss = fromBoss
-    this.active = true
-  }
-
-  update() {
-    this.position.x += this.speed
-
-    if (this.position.x < -100 || this.position.x > canvas.width + 100) {
-      this.active = false
-    }
-
-    c.fillStyle = this.fromBoss ? '#ef4444' : '#facc15'
-
-    if (this.fromBoss) {
-      c.beginPath()
-      c.arc(this.position.x, this.position.y, this.width / 2, 0, Math.PI * 2)
-      c.fill()
-    } else {
-      c.fillRect(this.position.x, this.position.y, this.width, this.height)
-    }
-  }
-}
-
-class Boss {
-  constructor({ x, y }) {
-    this.name = 'Commander Rexon'
-    this.position = { x, y }
-    this.width = 135
-    this.height = 165
-    this.maxHealth = 500
-    this.health = this.maxHealth
-    this.shootTimer = 90
-    this.alive = true
-  }
-
-  draw() {
-    if (!this.alive) return
-
-    c.fillStyle = '#312e81'
-    drawRoundedRect(this.position.x, this.position.y, this.width, this.height, 18)
-    c.fill()
-
-    c.fillStyle = '#f8fafc'
-    c.fillRect(this.position.x + 30, this.position.y + 35, 18, 18)
-    c.fillRect(this.position.x + 87, this.position.y + 35, 18, 18)
-
-    c.fillStyle = '#dc2626'
-    c.fillRect(this.position.x + 35, this.position.y + 95, 65, 12)
-
-    drawBossHealth()
-  }
-
-  update() {
-    if (!this.alive) return
-
-    this.shootTimer--
-
-    if (this.shootTimer <= 0) {
-      bossBullets.push(
-        new Bullet({
-          x: this.position.x,
-          y: this.position.y + 78,
-          speed: -8,
-          fromBoss: true
-        })
-      )
-
-      this.shootTimer = 80
-    }
-
-    this.draw()
-  }
-}
-
-class Door {
-  constructor({ x, y }) {
-    this.position = { x, y }
-    this.width = 78
-    this.height = 118
-    this.open = false
-  }
-
-  draw() {
-    c.fillStyle = this.open ? '#22c55e' : '#475569'
-    drawRoundedRect(this.position.x, this.position.y, this.width, this.height, 10)
-    c.fill()
-
-    c.strokeStyle = '#f8fafc'
-    c.lineWidth = 4
-    drawRoundedRect(this.position.x, this.position.y, this.width, this.height, 10)
-    c.stroke()
-
-    c.fillStyle = '#facc15'
-    c.beginPath()
-    c.arc(this.position.x + 58, this.position.y + 62, 5, 0, Math.PI * 2)
-    c.fill()
-
-    c.fillStyle = '#ffffff'
-    c.font = 'bold 14px Arial'
-    c.fillText(this.open ? 'ENTER' : 'LOCKED', this.position.x + 9, this.position.y - 10)
-  }
-}
-
-function createImage(imageSrc) {
-  const image = new Image()
-  image.src = imageSrc
-  return image
-}
-
-function drawRoundedRect(x, y, width, height, radius) {
-  c.beginPath()
-  c.moveTo(x + radius, y)
-  c.lineTo(x + width - radius, y)
-  c.quadraticCurveTo(x + width, y, x + width, y + radius)
-  c.lineTo(x + width, y + height - radius)
-  c.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-  c.lineTo(x + radius, y + height)
-  c.quadraticCurveTo(x, y + height, x, y + height - radius)
-  c.lineTo(x, y + radius)
-  c.quadraticCurveTo(x, y, x + radius, y)
-  c.closePath()
-}
-
 function drawButton(button) {
   const locked = button.locked
 
   c.fillStyle = locked ? colors.locked : colors.blue
-  drawRoundedRect(button.x, button.y, button.width, button.height, 14)
+  drawRoundedRect(c, button.x, button.y, button.width, button.height, 14)
   c.fill()
 
   c.strokeStyle = locked ? '#64748b' : colors.white
   c.lineWidth = 3
-  drawRoundedRect(button.x, button.y, button.width, button.height, 14)
+  drawRoundedRect(c, button.x, button.y, button.width, button.height, 14)
   c.stroke()
 
   c.fillStyle = colors.white
@@ -422,24 +122,6 @@ function drawButton(button) {
 
   c.textAlign = 'left'
   c.textBaseline = 'alphabetic'
-}
-
-function isInsideButton(mouse, button) {
-  return (
-    mouse.x >= button.x &&
-    mouse.x <= button.x + button.width &&
-    mouse.y >= button.y &&
-    mouse.y <= button.y + button.height
-  )
-}
-
-function rectanglesTouch(a, b) {
-  return (
-    a.position.x < b.position.x + b.width &&
-    a.position.x + a.width > b.position.x &&
-    a.position.y < b.position.y + b.height &&
-    a.position.y + a.height > b.position.y
-  )
 }
 
 function unlockNextMission() {
@@ -592,7 +274,7 @@ let platforms = []
 let enemies = []
 let genericObjects = []
 let bullets = []
-let bossBullets = []
+export let bossBullets = []
 let weaponPickup = null
 let boss = null
 let exitDoor = null
@@ -735,12 +417,12 @@ function drawGameHud() {
   const difficulty = difficulties[selectedDifficulty]
 
   c.fillStyle = 'rgba(15, 47, 120, 0.82)'
-  drawRoundedRect(20, 20, 355, 100, 14)
+  drawRoundedRect(c, 20, 20, 355, 100, 14)
   c.fill()
 
   c.strokeStyle = colors.white
   c.lineWidth = 2
-  drawRoundedRect(20, 20, 355, 100, 14)
+  drawRoundedRect(c, 20, 20, 355, 100, 14)
   c.stroke()
 
   c.fillStyle = colors.white
@@ -758,83 +440,6 @@ function drawGameHud() {
       100
     )
   }
-}
-
-function drawPlayerWeapon() {
-  const handX = player.position.x + player.width - 12
-  const handY = player.position.y + 78
-  const gunX = handX + 6
-  const gunY = handY - 8
-
-  c.save()
-
-  // Arm / hand holding the gun
-  c.fillStyle = '#f2c9a0'
-  drawRoundedRect(handX - 12, handY - 2, 24, 12, 6)
-  c.fill()
-
-  c.fillStyle = '#d8a06f'
-  drawRoundedRect(handX + 2, handY - 4, 16, 16, 6)
-  c.fill()
-
-  // Gun body
-  c.fillStyle = '#111827'
-  drawRoundedRect(gunX, gunY, 54, 16, 5)
-  c.fill()
-
-  // Top metal shine
-  c.fillStyle = '#64748b'
-  c.fillRect(gunX + 8, gunY + 3, 28, 3)
-
-  // Barrel
-  c.fillStyle = '#030712'
-  c.fillRect(gunX + 50, gunY + 5, 24, 6)
-
-  // Muzzle
-  c.fillStyle = '#38bdf8'
-  c.fillRect(gunX + 74, gunY + 4, 5, 8)
-
-  // Grip
-  c.fillStyle = '#374151'
-  drawRoundedRect(gunX + 16, gunY + 13, 12, 25, 4)
-  c.fill()
-
-  // Stock
-  c.fillStyle = '#1f2937'
-  drawRoundedRect(gunX - 13, gunY + 4, 18, 12, 4)
-  c.fill()
-
-  // Sight
-  c.strokeStyle = '#e5e7eb'
-  c.lineWidth = 2
-  c.beginPath()
-  c.moveTo(gunX + 24, gunY)
-  c.lineTo(gunX + 30, gunY - 8)
-  c.lineTo(gunX + 38, gunY)
-  c.stroke()
-
-  c.restore()
-}
-
-function drawBossHealth() {
-  if (!boss || !boss.alive) return
-
-  c.fillStyle = 'rgba(0, 0, 0, 0.65)'
-  drawRoundedRect(612, 24, 370, 72, 12)
-  c.fill()
-
-  c.fillStyle = colors.white
-  c.font = 'bold 18px Arial'
-  c.fillText(`${boss.name}`, 632, 50)
-
-  c.fillStyle = '#7f1d1d'
-  c.fillRect(632, 65, 315, 16)
-
-  c.fillStyle = '#22c55e'
-  c.fillRect(632, 65, 315 * (boss.health / boss.maxHealth), 16)
-
-  c.strokeStyle = colors.white
-  c.strokeRect(632, 65, 315, 16)
 }
 
 function shootPlayerBullet() {
@@ -1242,3 +847,8 @@ addEventListener('keyup', ({ keyCode }) => {
       break
   }
 })
+
+// Global layout functions to pass as callbacks for classes
+export function drawBossHealth() {
+  if (boss) boss.drawBossHealth()
+}
